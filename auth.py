@@ -12,7 +12,7 @@ def create_access_token(user):
     
     payload = {
         "sub": str(user["id"]),
-        "username": user.username,
+        "username": user["username"],
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=15)).timestamp()),
         "jti": str(uuid.uuid4())

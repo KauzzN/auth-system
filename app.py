@@ -2,7 +2,9 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from db import conn, cursor
-from security import hash_password
+from auth import create_access_token
+from security import hash_password, verify_password
+
 
 app = FastAPI()
 
@@ -37,12 +39,12 @@ async def criar_users(request: Request):
     """
     
     cursor.execute(check_username, (username,))
-    usuario = cursor.fetchone()
+    usuario_username = cursor.fetchone()
     
-    if usuario:
+    if usuario_username:
         return JSONResponse(
             content={
-                "error": "Usuario já existe!"
+                "error": "Username já existe!"
             }, status_code=status.HTTP_401_UNAUTHORIZED
         )
         
@@ -61,7 +63,6 @@ async def criar_users(request: Request):
             }, status_code=status.HTTP_401_UNAUTHORIZED
         )
         
-    print(incomming_password)
     password = hash_password(incomming_password)
     valores = (username, email, password)
     
@@ -84,27 +85,38 @@ async def criar_users(request: Request):
             }
     })
     
-@app.get("/login")
+@app.post("/login")
 async def login_user(request: Request):
     
-    data = request.json()
+    data = await request.json()
     
-    username = data.get("username")
     email = data.get("email")
     password = data.get("password")
     
-    check_email = """
+    query_find_email = """
         SELECT * FROM users
         WHERE email = %s;
     """
     
-    cursor.execute(check_email, (email,))
-    usuario_email = cursor.fetchone()
+    cursor.execute(query_find_email, (email,))
+    usuario = cursor.fetchone()
     
-    if usuario_email:
-        return JSONResponse(
-            content={
-                "error": "Usuario já existe!"
-            }, status_code=status.HTTP_401_UNAUTHORIZED
-        )
+    if usuario is None:
+        return JSONResponse({
+            "message": "Email ou senha inválidos"
+        }, status_code=status.HTTP_404_NOT_FOUND)
     
+    senha_valida = verify_password(password, usuario["password"])
+    
+    if not senha_valida:
+        return JSONResponse({
+            "error": "Senha inválida"
+        }, status_code=status.HTTP_401_UNAUTHORIZED)
+        
+            
+    token = create_access_token(usuario)
+    
+    
+    return JSONResponse({
+        "token": token
+    })
